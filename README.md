@@ -1,54 +1,47 @@
-# TimeRoute - Backend
+# 🕒 TimeRoute - Sistema de Gestión de Visitas Domiciliarias
 
-Este repositorio contiene la lógica de servidor y la base de datos para la aplicación TimeRoute.
+TimeRoute es una solución backend robusta diseñada para gestionar la asistencia de trabajadores de campo. A diferencia de un sistema de fichaje estático, TimeRoute utiliza geolocalización dinámica para validar que el trabajador se encuentra en la ubicación del paciente antes de permitir el inicio de la jornada.
 
-## Tecnologías
-* **PHP 8.x** (Estructura orientada a objetos)
-* **MySQL** (Base de datos relacional)
-* **PDO** (Para conexiones seguras)
+## Funcionalidades Principales
 
-## Funcionalidades implementadas
-- [x] Conexión a DB centralizada.
-- [x] Autenticación de usuarios con **password_hash** (Bcrypt).
-- [x] Registro de inicio de jornada con coordenadas GPS.
-- [x] Registro de fin de jornada y cálculo automático de horas.
+* **Validación GPS:** El sistema calcula la distancia real entre el móvil y el paciente. Solo permite fichar si el trabajador está a menos de 200 metros.
+* **Gestión de Hojas de Ruta:** Los trabajadores reciben una lista ordenada de pacientes asignados para el día.
+* **Cálculo Automático de Tiempos:** Registra el tiempo exacto (en minutos) dedicado a cada intervención.
+* **Panel de Administración:** Endpoints dedicados para crear pacientes y asignar rutas diarias.
 
-## Instalación
-1. Clonar el repositorio.
-2. Importar el archivo `database.sql` en phpMyAdmin.
-3. Configurar credenciales en `config/db.php`.
+## 🛠️ Instalación y Configuración
 
-## Guía para mis compañeros de proyecto
+1.  **Base de Datos:**
+    * Crea una base de datos en MySQL llamada `timeroute_db`.
+    * Importa el archivo `database.sql` ubicado en la raíz del proyecto.
+    * *Nota: El SQL incluye un usuario administrador (`admin@timeroute.com`) y un trabajador (`juan@timeroute.com`) para pruebas.*
 
-Si acabas de clonar el repositorio o necesitas actualizar tu base de datos local, sigue estos pasos:
+2.  **Conexión PHP:**
+    * Configura tus credenciales en `backend/config/db.php`.
 
-1. **Actualizar código local:**
-   ```bash
-   git pull origin main
+## 📡 Guía de la API (para Frontend)
 
-2. **Configurar la Base de Datos:**
+### 👥 Usuarios y Rutas
+* **Login:** `POST /api/login.php` (Retorna `id_usuario` y `rol`).
+* **Obtener Ruta:** `GET /api/obtener_ruta.php?id={id_usuario}` (Retorna lista de pacientes del día).
 
-  Abre phpMyAdmin en tu navegador.
-  Crea una nueva base de datos llamada timeroute_db.
-  Selecciona la base de datos recién creada.
-  Ve a la pestaña Importar.
-  Selecciona el archivo database.sql que se encuentra en la raíz de este proyecto.
-  Haz clic en Importar al final de la página.
+### 📍 Gestión de Visitas
+* **Iniciar Visita:** `POST /api/fichar.php`
+    * Payload: `{"id_asignacion": X, "latitud": X, "longitud": X}`
+* **Finalizar Visita:** `POST /api/fichar_fin.php`
+    * Payload: `{"id_asignacion": X}`
 
-3. **Configuración de conexión:**
+### 🔑 Administración
+* **Crear Paciente:** `POST /admin/crear_paciente.php`
+* **Asignar Ruta:** `POST /admin/asignar_ruta.php`
 
- Asegúrate de que tu archivo config/db.php tiene las credenciales correctas de tu entorno local (usuario y contraseña de MySQL).
+## 📁 Estructura del Proyecto
 
-
-## Guía de Conexión Frontend-Backend 
-
-Para conectar el Frontend con este Backend, solo hay que realizar peticiones HTTP a los archivos en \`backend/api/\`.
-
-* **Base URL:** \`http://localhost/timeroute/backend/api/\`
-* **CORS:** Ya configurado en PHP (\`*\`).
-* **Formato:** JSON (Entrada y Salida).
-
-### Endpoints:
-1. **Login:** \`POST /login.php\`
-2. **Fichar Inicio:** \`POST /fichar.php\`
-3. **Fichar Fin:** \`POST /fichar_fin.php\`
+```text
+backend/
+├── admin/          # Gestión para el administrador
+├── api/            # Endpoints para la App móvil (Angular)
+├── config/         # Conexión a DB
+├── src/
+│   └── Models/     # Lógica de negocio (GestionVisitas.php)
+└── database.sql    # Script de creación de tablas
