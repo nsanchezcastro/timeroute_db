@@ -46,8 +46,8 @@ backend/
 │   └── Models/     # Lógica de negocio (GestionVisitas.php)
 └── database.sql    # Script de creación de tablas
 
-**Guía de Conexión para Frontend**
-Si al intentar usar los endpoints te encuentras con problemas, revisa estos puntos:
+## **Guía de Conexión para Frontend**
+*Si al intentar usar los endpoints te encuentras con problemas, revisa estos puntos:
 
 1. Error "404 Not Found"
 Causa: La URL en el HttpClient de Angular no coincide con tu carpeta.
