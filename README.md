@@ -1,15 +1,17 @@
-# 🕒 TimeRoute - Sistema de Gestión de Visitas Domiciliarias
+# TimeRoute 
 
 TimeRoute es una solución backend robusta diseñada para gestionar la asistencia de trabajadores de campo. A diferencia de un sistema de fichaje estático, TimeRoute utiliza geolocalización dinámica para validar que el trabajador se encuentra en la ubicación del paciente antes de permitir el inicio de la jornada.
 
-## Funcionalidades Principales
+## Funcionalidades Principales del Backend
 
 * **Validación GPS:** El sistema calcula la distancia real entre el móvil y el paciente. Solo permite fichar si el trabajador está a menos de 200 metros.
 * **Gestión de Hojas de Ruta:** Los trabajadores reciben una lista ordenada de pacientes asignados para el día.
 * **Cálculo Automático de Tiempos:** Registra el tiempo exacto (en minutos) dedicado a cada intervención.
 * **Panel de Administración:** Endpoints dedicados para crear pacientes y asignar rutas diarias.
+* **Obtención de informes:** Generación automática de informes y acceso a los mismos por parte del administrador.
 
-## 🛠️ Instalación y Configuración
+
+##  Instalación y Configuración
 
 1.  **Base de Datos:**
     * Crea una base de datos en MySQL llamada `timeroute_db`.
@@ -19,23 +21,23 @@ TimeRoute es una solución backend robusta diseñada para gestionar la asistenci
 2.  **Conexión PHP:**
     * Configura tus credenciales en `backend/config/db.php`.
 
-## 📡 Guía de la API (para Frontend)
+## Guía de la API (para Frontend)
 
-### 👥 Usuarios y Rutas
+### Usuarios y Rutas
 * **Login:** `POST /api/login.php` (Retorna `id_usuario` y `rol`).
 * **Obtener Ruta:** `GET /api/obtener_ruta.php?id={id_usuario}` (Retorna lista de pacientes del día).
 
-### 📍 Gestión de Visitas
+### Gestión de Visitas
 * **Iniciar Visita:** `POST /api/fichar.php`
     * Payload: `{"id_asignacion": X, "latitud": X, "longitud": X}`
 * **Finalizar Visita:** `POST /api/fichar_fin.php`
     * Payload: `{"id_asignacion": X}`
 
-### 🔑 Administración
+### Administración
 * **Crear Paciente:** `POST /admin/crear_paciente.php`
 * **Asignar Ruta:** `POST /admin/asignar_ruta.php`
 
-## 📁 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```text
 backend/
