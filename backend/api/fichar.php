@@ -1,39 +1,32 @@
 <?php
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
-
+header("Content-Type: application/json");
 require_once '../config/db.php';
-require_once '../src/Models/Jornada.php';
+require_once '../src/Models/GestionVisitas.php';
 
 $database = new Database();
 $db = $database->getConnection();
-$jornada = new Jornada($db);
+$gestion = new GestionVisitas($db);
 
-// Leer los datos del Body de la petición
+// Recibimos los datos del JSON (Angular enviará esto)
 $data = json_decode(file_get_contents("php://input"));
 
-if(!empty($data->id_usuario)) {
-    // Guardar lat/lng
-    $lat = isset($data->latitud) ? $data->latitud : null;
-    $lng = isset($data->longitud) ? $data->longitud : null;
+if (!empty($data->id_asignacion) && isset($data->latitud) && isset($data->longitud)) {
+    
+    // Llamamos al método del Modelo
+    $resultado = $gestion->iniciarVisita(
+        $data->id_asignacion, 
+        $data->latitud, 
+        $data->longitud
+    );
 
-    $id_creado = $jornada->iniciar($data->id_usuario, $lat, $lng);
-
-    if($id_creado) {
+    if ($resultado['status'] === 'success') {
         http_response_code(201);
-        echo json_encode([
-            "status" => "success",
-            "message" => "Jornada iniciada correctamente",
-            "id_jornada" => $id_creado
-        ]);
     } else {
-        http_response_code(503);
-        echo json_encode(["status" => "error", "message" => "Error al registrar el fichaje"]);
+        http_response_code(400); // Error de validación (ej: lejos del paciente)
     }
+    echo json_encode($resultado);
+
 } else {
     http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "ID de usuario necesario"]);
+    echo json_encode(["status" => "error", "message" => "Datos de fichaje incompletos (ID, Lat o Lng)"]);
 }

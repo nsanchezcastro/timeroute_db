@@ -12,7 +12,7 @@ $db = $database->getConnection();
 if($db) {
     echo "Conexión exitosa.<br>";
     
-    // Instancuar Usuario
+    // Instanciar Usuario
     if (class_exists('Usuario')) {
         $usuario = new Usuario($db);
         $stmt = $usuario->leer();
