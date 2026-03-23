@@ -1,77 +1,63 @@
-# TimeRoute 
+Timeroute API - Gestión de Rutas y Fichaje Geolocalizado
+Este es el Backend del proyecto Timeroute, una solución integral para la gestión de jornadas laborales de operadores de ruta. La API permite el seguimiento en tiempo real, control de pausas e inicios/cierres de jornada con validación de ubicación GPS.
 
-TimeRoute es una solución backend robusta diseñada para gestionar la asistencia de trabajadores de campo. A diferencia de un sistema de fichaje estático, TimeRoute utiliza geolocalización dinámica para validar que el trabajador se encuentra en la ubicación del paciente antes de permitir el inicio de la jornada.
+-Características Principales:
+Autenticación: Sistema de login seguro con password_hash y verificación de roles (Admin/Trabajador).
 
-## Funcionalidades Principales del Backend
+Gestión de Jornadas: Endpoint dinámico para obtener la "Hoja de Ruta" diaria del trabajador.
 
-* **Validación GPS:** El sistema calcula la distancia real entre el móvil y el paciente. Solo permite fichar si el trabajador está a menos de 200 metros.
-* **Gestión de Hojas de Ruta:** Los trabajadores reciben una lista ordenada de pacientes asignados para el día.
-* **Cálculo Automático de Tiempos:** Registra el tiempo exacto (en minutos) dedicado a cada intervención.
-* **Panel de Administración:** Endpoints dedicados para crear pacientes y asignar rutas diarias.
-* **Obtención de informes:** Generación automática de informes y acceso a los mismos por parte del administrador.
+Fichaje Inteligente: Registro de llegada y salida de visitas con validación de distancia (Haversine) de un máximo de 200 metros respecto al cliente.
 
+Control de Tiempos: Cálculo automático de minutos dedicados por visita y gestión de pausas activas.
 
-##  Instalación y Configuración
+Arquitectura: PHP nativo bajo patrón de modelos, siguiendo principios REST.
 
-1.  **Base de Datos:**
-    * Crea una base de datos en MySQL llamada `timeroute_db`.
-    * Importa el archivo `database.sql` ubicado en la raíz del proyecto.
-    * *Nota: El SQL incluye un usuario administrador (`admin@timeroute.com`) y un trabajador (`juan@timeroute.com`) para pruebas.*
+Módulo de Reporting: Capacidad de generar historiales diarios agregados por fecha para supervisión administrativa.
 
-2.  **Conexión PHP:**
-    * Configura tus credenciales en `backend/config/db.php`.
+-Stack Tecnológico:
+Lenguaje: PHP 8.x
 
-## Guía de la API (para Frontend)
+Base de Datos: MySQL (Base de datos unificada: timeroute)
 
-### Usuarios y Rutas
-* **Login:** `POST /api/login.php` (Retorna `id_usuario` y `rol`).
-* **Obtener Ruta:** `GET /api/obtener_ruta.php?id={id_usuario}` (Retorna lista de pacientes del día).
+Formato de Intercambio: JSON
 
-### Gestión de Visitas
-* **Iniciar Visita:** `POST /api/fichar.php`
-    * Payload: `{"id_asignacion": X, "latitud": X, "longitud": X}`
-* **Finalizar Visita:** `POST /api/fichar_fin.php`
-    * Payload: `{"id_asignacion": X}`
+Seguridad: CORS integrado para consumo desde aplicaciones Angular.
 
-### Administración
-* **Crear Paciente:** `POST /admin/crear_paciente.php`
-* **Asignar Ruta:** `POST /admin/asignar_ruta.php`
+-Estructura del Proyecto:
 
-## Estructura del Proyecto
+├── api/
+│   ├── auth/                # Login y gestión de sesiones
+│   ├── mis-jornadas/        # Endpoint principal de la hoja de ruta
+│   ├── jornadas/            # Iniciar, finalizar e incidencias
+│   ├── pausas/              # Control de descansos
+│   └── visitas/             # Fichaje de llegada/salida (lat/lng)
+├── config/
+│   ├── db.php               # Conexión PDO
+│   └── cors.php             # Configuración de cabeceras HTTP
+└── src/
+    └── Models/              # Lógica de negocio (GestionVisitas.php, Usuario.php, Informe.php)
 
-```text
-backend/
-├── admin/          # Gestión para el administrador
-├── api/            # Endpoints para la App móvil (Angular)
-├── config/         # Conexión a DB
-├── src/
-│   └── Models/     # Lógica de negocio (GestionVisitas.php)
-└── database.sql    # Script de creación de tablas
+-Requisitos de la Base de Datos:
+El sistema utiliza el esquema unificado timeroute. Asegúrate de tener las siguientes tablas clave:
 
-## **Guía de Conexión para Frontend**
-*Si al intentar usar los endpoints te encuentras con problemas, revisa estos puntos:
+usuarios: Credenciales y roles.
 
-1. Error "404 Not Found"
-Causa: La URL en el HttpClient de Angular no coincide con tu carpeta.
+jornadas: Cabecera de la ruta diaria.
 
-Solución: Verifica que la URL sea http://localhost/timeroute_b/backend/api/nombre_archivo.php 
+rutas: Nombres y definiciones de trayectos.
 
-2. Error "403 Forbidden" o "CORS Error"
-Causa: El servidor no está enviando las cabeceras de cors.php.
+clientes: Datos maestros y geolocalización (lat, lng).
 
-Solución: Asegúrate de que todos tus archivos en la carpeta api/ tengan la línea require_once '../config/cors.php'; al principio.
+visitas: Detalle de paradas y tiempos reales.
 
-3. Los datos llegan vacíos (null) al Backend
-Causa: Angular envía los datos como JSON, pero PHP a veces intenta leerlos como un formulario normal.
+-Instalación y Uso:
+Clona el repositorio en tu servidor local (XAMPP/Laragon).
 
-Solución: Asegúrate de que en el Service de Angular estés usando los headers correctos:
+Importa el script SQL de la base de datos timeroute.
 
-TypeScript
-const httpOptions = {
-  headers: new HttpHeaders({ 'Content-Type': 'application/json' })
-};
-4. Error de GPS (Distancia > 200m)
-Causa: El trabajador está probando la app desde su casa y el paciente está en otra dirección.
+Configura tus credenciales en config/db.php.
 
-Solución: Para las pruebas, cambiad temporalmente las coordenadas del paciente en la base de datos (tabla pacientes) por unas que estén cerca de vuestra ubicación actual.
+Apunta tu Frontend de Angular a la URL base de esta API.
 
+-Nota para los colaboradores:
+Para probar el sistema de fichaje, asegúrate de enviar las coordenadas del dispositivo en el cuerpo del JSON (lat, lng). El sistema devolverá un error 400 si el usuario se encuentra a más de 200 metros del destino.

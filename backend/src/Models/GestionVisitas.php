@@ -1,180 +1,128 @@
 <?php
 class GestionVisitas {
     private $conn;
-    private $table_asignaciones = "asignaciones";
-    private $table_pacientes = "pacientes";
 
     public function __construct($db) {
         $this->conn = $db;
     }
 
-    // Obtener la lista de pacientes del día para un trabajador específico
+    /**
+     * Obtener la hoja de ruta completa (Jornada + Sus Visitas)
+     */
     public function obtenerHojaDeRuta($id_usuario) {
-        $query = "SELECT 
-                    a.id_asignacion, 
-                    a.orden_visita, 
-                    a.estado, 
-                    p.nombre AS nombre_paciente, 
-                    p.direccion, 
-                    p.latitud, 
-                    p.longitud
-                  FROM " . $this->table_asignaciones . " a
-                  JOIN " . $this->table_pacientes . " p ON a.id_paciente = p.id_paciente
-                  WHERE a.id_usuario = :id 
-                  AND a.fecha = CURDATE()
-                  ORDER BY a.orden_visita ASC";
-
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([':id' => $id_usuario]);
+        // 1. Buscamos la jornada activa de hoy para el usuario
+        $queryJornada = "SELECT 
+                            j.id, 
+                            j.fecha, 
+                            j.estado, 
+                            r.nombre AS nombre_ruta, 
+                            j.pausa_activa 
+                        FROM jornadas j
+                        JOIN rutas r ON j.id_ruta = r.id
+                        WHERE j.id_usuario = :id 
+                        AND j.fecha = CURDATE() 
+                        LIMIT 1";
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmtJ = $this->conn->prepare($queryJornada);
+        $stmtJ->execute([':id' => $id_usuario]);
+        $jornada = $stmtJ->fetch(PDO::FETCH_ASSOC);
+
+        if (!$jornada) return null;
+
+        // 2. Buscamos todas las visitas (paradas) asociadas a esa jornada
+        $queryVisitas = "SELECT 
+                            v.id_cliente, 
+                            c.nombre AS nombre_cliente, 
+                            c.direccion, 
+                            c.latitud AS lat, 
+                            c.longitud AS lng,
+                            v.orden,
+                            v.llegada,
+                            v.salida,
+                            v.duracion_minutos
+                         FROM visitas v
+                         JOIN clientes c ON v.id_cliente = c.id_cliente
+                         WHERE v.id_jornada = :id_jornada
+                         ORDER BY v.orden ASC";
+
+        $stmtV = $this->conn->prepare($queryVisitas);
+        $stmtV->execute([':id_jornada' => $jornada['id_jornada']]);
+        
+        // Añadimos las paradas al array de la jornada
+        $jornada['paradas'] = $stmtV->fetchAll(PDO::FETCH_ASSOC);
+
+        return $jornada;
     }
 
-    public function iniciarVisita($id_asignacion, $lat_usuario, $long_usuario) {
-    // 1. Obtener la ubicación real del paciente para esta asignación
-    $query = "SELECT p.latitud, p.longitud, a.estado 
-              FROM asignaciones a 
-              JOIN pacientes p ON a.id_paciente = p.id_paciente 
-              WHERE a.id_asignacion = :id_asig";
-    
-    $stmt = $this->conn->prepare($query);
-    $stmt->execute([':id_asig' => $id_asignacion]);
-    $datos = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$datos) return ["status" => "error", "message" => "Asignación no encontrada"];
-    if ($datos['estado'] !== 'pendiente') return ["status" => "error", "message" => "Esta visita ya está en curso o finalizada"];
-
-    // 2. Calcular distancia (Haversine) entre usuario y paciente
-    $distancia = $this->calcularDistancia($lat_usuario, $long_usuario, $datos['latitud'], $datos['longitud']);
-
-    // Permitimos un margen de 200 metros (por precisión del GPS móvil)
-    if ($distancia > 200) {
-        return [
-            "status" => "error", 
-            "message" => "Estás demasiado lejos del paciente (" . round($distancia) . "m). Acércate a la ubicación."
-        ];
+    /**
+     * Iniciar jornada (Cambiar estado de CREADA a EN_CURSO)
+     */
+    public function iniciarJornada($id_jornada) {
+        $query = "UPDATE jornadas SET estado = 'EN_CURSO', inicio_real = NOW() WHERE id_jornada = :id";
+        $stmt = $this->conn->prepare($query);
+        return $stmt->execute([':id' => $id_jornada]);
     }
 
-    // 3. Si está cerca, iniciamos el registro
-    $this->conn->beginTransaction();
-    try {
-        // Actualizamos estado de la asignación
-        $sql1 = "UPDATE asignaciones SET estado = 'en_curso' WHERE id_asignacion = :id_asig";
-        $stmt1 = $this->conn->prepare($sql1);
-        $stmt1->execute([':id_asig' => $id_asignacion]);
-
-        // Creamos el registro de tiempo
-        $sql2 = "INSERT INTO registros_visita (id_asignacion, hora_inicio) VALUES (:id_asig, NOW())";
-        $stmt2 = $this->conn->prepare($sql2);
-        $stmt2->execute([':id_asig' => $id_asignacion]);
-
-        $this->conn->commit();
-        return ["status" => "success", "message" => "Visita iniciada correctamente"];
-    } catch (Exception $e) {
-        $this->conn->rollBack();
-        return ["status" => "error", "message" => "Error al guardar: " . $e->getMessage()];
-    }
-}
-
-// Función auxiliar para calcular distancia en metros
-private function calcularDistancia($lat1, $lon1, $lat2, $lon2) {
-    $rad = M_PI / 180;
-    $dLat = ($lat2 - $lat1) * $rad;
-    $dLon = ($lon2 - $lon1) * $rad;
-    $a = sin($dLat/2) * sin($dLat/2) + cos($lat1 * $rad) * cos($lat2 * $rad) * sin($dLon/2) * sin($dLon/2);
-    $c = 2 * atan2(sqrt($a), sqrt(1-$a));
-    return 6371000 * $c; // Resultado en metros
-}
-
-public function crearPaciente($nombre, $direccion, $lat, $lng) {
-    $query = "INSERT INTO " . $this->table_pacientes . " (nombre, direccion, latitud, longitud) 
-              VALUES (:nombre, :direccion, :lat, :lng)";
-    
-    $stmt = $this->conn->prepare($query);
-    
-    return $stmt->execute([
-        ':nombre'    => $nombre,
-        ':direccion' => $direccion,
-        ':lat'       => $lat,
-        ':lng'       => $lng
-    ]);
-}
-
-public function finalizarVisita($id_asignacion) {
-    // 1. Buscamos el registro de inicio para esta asignación
-    $query = "SELECT id_registro, hora_inicio FROM registros_visita 
-              WHERE id_asignacion = :id_asig AND hora_fin IS NULL LIMIT 1";
-    
-    $stmt = $this->conn->prepare($query);
-    $stmt->execute([':id_asig' => $id_asignacion]);
-    $registro = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$registro) return ["status" => "error", "message" => "No hay una visita activa para finalizar"];
-
-    // 2. Calculamos la diferencia de tiempo
-    $inicio = new DateTime($registro['hora_inicio']);
-    $fin = new DateTime(); // Hora actual
-    $intervalo = $inicio->diff($fin);
-    
-    // Convertimos a minutos totales
-    $minutos = ($intervalo->h * 60) + $intervalo->i + ($intervalo->days * 1440);
-
-    // 3. Actualizamos las tablas (Transacción para asegurar que ambas cambian o ninguna)
-    $this->conn->beginTransaction();
-    try {
-        // Marcamos la visita como completada en la hoja de ruta
-        $sql1 = "UPDATE asignaciones SET estado = 'completado' WHERE id_asignacion = :id_asig";
-        $stmt1 = $this->conn->prepare($sql1);
-        $stmt1->execute([':id_asig' => $id_asignacion]);
-
-        // Guardamos la hora de fin y los minutos en el registro
-        $sql2 = "UPDATE registros_visita 
-                 SET hora_fin = NOW(), minutos_visita = :min 
-                 WHERE id_registro = :id_reg";
-        $stmt2 = $this->conn->prepare($sql2);
-        $stmt2->execute([
-            ':min' => $minutos,
-            ':id_reg' => $registro['id_registro']
-        ]);
-
-        $this->conn->commit();
-        return [
-            "status" => "success", 
-            "minutos_dedicados" => $minutos,
-            "message" => "Visita finalizada. Tiempo registrado: $minutos min."
-        ];
-    } catch (Exception $e) {
-        $this->conn->rollBack();
-        return ["status" => "error", "message" => "Error al finalizar: " . $e->getMessage()];
-    }
-}
-
-public function asignarVisita($id_usuario, $id_paciente, $fecha, $orden) {
-    // 1. Verificar si ya existe esa asignación exacta
-    $check = "SELECT id_asignacion FROM asignaciones 
-              WHERE id_usuario = :u AND id_paciente = :p AND fecha = :f";
-    $stmt_check = $this->conn->prepare($check);
-    $stmt_check->execute([':u' => $id_usuario, ':p' => $id_paciente, ':f' => $fecha]);
-
-    if ($stmt_check->rowCount() > 0) {
-        return ["status" => "error", "message" => "Este trabajador ya tiene asignado este paciente para ese día."];
+    /**
+     * Finalizar jornada
+     */
+    public function finalizarJornada($id_jornada) {
+        $query = "UPDATE jornadas SET estado = 'FINALIZADA', fin_real = NOW() WHERE id_jornada = :id";
+        $stmt = $this->conn->prepare($query);
+        return $stmt->execute([':id' => $id_jornada]);
     }
 
-    // 2. Insertar la nueva ruta
-    $query = "INSERT INTO asignaciones (id_usuario, id_paciente, fecha, orden_visita, estado) 
-              VALUES (:u, :p, :f, :o, 'pendiente')";
-    
-    $stmt = $this->conn->prepare($query);
-    $resultado = $stmt->execute([
-        ':u' => $id_usuario,
-        ':p' => $id_paciente,
-        ':f' => $fecha,
-        ':o' => $orden
-    ]);
+    /**
+     * Registrar llegada (Validación de distancia incluida)
+     */
+    public function registrarLlegada($id_jornada, $id_cliente, $lat_movil, $lng_movil) {
+        // 1. Obtener ubicación del cliente
+        $query = "SELECT latitud, longitud FROM clientes WHERE id_cliente = :id LIMIT 1";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':id' => $id_cliente]);
+        $cliente = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($resultado) {
-        return ["status" => "success", "message" => "Ruta asignada correctamente."];
+        if (!$cliente) return ["status" => "error", "message" => "Cliente no encontrado"];
+
+        // 2. Calcular distancia
+        $distancia = $this->calcularDistancia($lat_movil, $lng_movil, $cliente['latitud'], $cliente['longitud']);
+
+        if ($distancia > 200) {
+            return ["status" => "error", "message" => "Demasiado lejos (" . round($distancia) . "m)"];
+        }
+
+        // 3. Update en la tabla visitas
+        $upd = "UPDATE visitas SET llegada = NOW() WHERE id_jornada = :jId AND id_cliente = :cId";
+        $stmtUpd = $this->conn->prepare($upd);
+        $stmtUpd->execute([':jId' => $id_jornada, ':cId' => $id_cliente]);
+
+        return ["status" => "success", "distancia" => round($distancia, 2)];
     }
-    return ["status" => "error", "message" => "No se pudo realizar la asignación."];
-}
+
+    /**
+     * Registrar salida y calcular duración
+     */
+    public function registrarSalida($id_jornada, $id_cliente) {
+        $query = "UPDATE visitas 
+                  SET salida = NOW(), 
+                      duracion_minutos = TIMESTAMPDIFF(MINUTE, llegada, NOW()) 
+                  WHERE id_jornada = :jId AND id_cliente = :cId AND llegada IS NOT NULL";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':jId' => $id_jornada, ':cId' => $id_cliente]);
+
+        return ($stmt->rowCount() > 0);
+    }
+
+    /**
+     * Auxiliar: Haversine
+     */
+    private function calcularDistancia($lat1, $lon1, $lat2, $lon2) {
+        $rad = M_PI / 180;
+        $dLat = ($lat2 - $lat1) * $rad;
+        $dLon = ($lon2 - $lon1) * $rad;
+        $a = sin($dLat/2) * sin($dLat/2) + cos($lat1 * $rad) * cos($lat2 * $rad) * sin($dLon/2) * sin($dLon/2);
+        $c = 2 * atan2(sqrt($a), sqrt(1-$a));
+        return 6371000 * $c;
+    }
 }

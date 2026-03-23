@@ -1,5 +1,4 @@
 <?php
-
 class Informe {
     private $conn;
 
@@ -7,24 +6,24 @@ class Informe {
         $this->conn = $db;
     }
 
-    // Función para obtener el historial de visitas de un día concreto cruzando las 4 tablas
     public function obtenerHistorialDiario($fecha) {
         try {
+            // Adaptado a la nueva DB: jornadas, visitas, usuarios y clientes
             $query = "SELECT 
-                        a.id_asignacion, 
+                        v.id_jornada, 
                         u.nombre as empleado, 
-                        p.nombre as paciente, 
-                        p.direccion,
-                        a.estado, 
-                        r.hora_inicio, 
-                        r.hora_fin, 
-                        r.minutos_visita
-                      FROM asignaciones a
-                      JOIN usuarios u ON a.id_usuario = u.id_usuario
-                      JOIN pacientes p ON a.id_paciente = p.id_paciente
-                      LEFT JOIN registros_visita r ON a.id_asignacion = r.id_asignacion
-                      WHERE a.fecha = :fecha
-                      ORDER BY u.nombre ASC, a.orden_visita ASC";
+                        c.nombre as cliente, 
+                        c.direccion,
+                        j.estado as estado_jornada, 
+                        v.llegada as hora_inicio, 
+                        v.salida as hora_fin, 
+                        v.duracion_minutos
+                      FROM visitas v
+                      JOIN jornadas j ON v.id_jornada = j.id
+                      JOIN usuarios u ON j.id_usuario = u.id
+                      JOIN clientes c ON v.id_cliente = c.id
+                      WHERE j.fecha = :fecha
+                      ORDER BY u.nombre ASC, v.orden ASC";
 
             $stmt = $this->conn->prepare($query);
             $stmt->bindParam(":fecha", $fecha);
@@ -34,6 +33,7 @@ class Informe {
 
             return [
                 "status" => "success",
+                "fecha_informe" => $fecha,
                 "total_registros" => count($resultados),
                 "data" => $resultados
             ];
@@ -46,4 +46,3 @@ class Informe {
         }
     }
 }
-?>
