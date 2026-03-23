@@ -1,63 +1,57 @@
-Timeroute API - Gestión de Rutas y Fichaje Geolocalizado
-Este es el Backend del proyecto Timeroute, una solución integral para la gestión de jornadas laborales de operadores de ruta. La API permite el seguimiento en tiempo real, control de pausas e inicios/cierres de jornada con validación de ubicación GPS.
+# Timeroute 
+### Gestión de Rutas y Fichaje Geolocalizado
 
--Características Principales:
-Autenticación: Sistema de login seguro con password_hash y verificación de roles (Admin/Trabajador).
+Este es el **Backend** del proyecto Timeroute, una solución integral para la gestión de jornadas laborales de operadores de ruta. La API permite el seguimiento en tiempo real, control de pausas e inicios/cierres de jornada con validación de ubicación GPS.
 
-Gestión de Jornadas: Endpoint dinámico para obtener la "Hoja de Ruta" diaria del trabajador.
+---
 
-Fichaje Inteligente: Registro de llegada y salida de visitas con validación de distancia (Haversine) de un máximo de 200 metros respecto al cliente.
+## Características Principales
 
-Control de Tiempos: Cálculo automático de minutos dedicados por visita y gestión de pausas activas.
+* **Autenticación:** Login seguro con `password_verify` y gestión de roles.
+* **Gestión de Jornadas:** Endpoint dinámico para obtener la "Hoja de Ruta" diaria.
+* **Fichaje Inteligente:** Registro de llegada/salida con **validación de distancia (Haversine)** de un máximo de 200 metros.
+* **Módulo de Reporting:** Generación de historiales diarios para supervisión administrativa.
 
-Arquitectura: PHP nativo bajo patrón de modelos, siguiendo principios REST.
+---
 
-Módulo de Reporting: Capacidad de generar historiales diarios agregados por fecha para supervisión administrativa.
+## Stack Tecnológico
 
--Stack Tecnológico:
-Lenguaje: PHP 8.x
+* **Lenguaje:** PHP 8.x (Nativo)
+* **Base de Datos:** MySQL (Esquema unificado `timeroute`)
+* **Seguridad:** CORS configurado para Angular y cifrado de contraseñas.
 
-Base de Datos: MySQL (Base de datos unificada: timeroute)
+---
 
-Formato de Intercambio: JSON
+## Estructura del Proyecto
 
-Seguridad: CORS integrado para consumo desde aplicaciones Angular.
-
--Estructura del Proyecto:
-
+```text
+├── admin/               # Generación de informes (Admin)
 ├── api/
-│   ├── auth/                # Login y gestión de sesiones
-│   ├── mis-jornadas/        # Endpoint principal de la hoja de ruta
-│   ├── jornadas/            # Iniciar, finalizar e incidencias
-│   ├── pausas/              # Control de descansos
-│   └── visitas/             # Fichaje de llegada/salida (lat/lng)
-├── config/
-│   ├── db.php               # Conexión PDO
-│   └── cors.php             # Configuración de cabeceras HTTP
+│   ├── auth/            # Login y sesiones
+│   ├── mis-jornadas/    # Endpoint principal (Hoja de Ruta)
+│   ├── jornadas/        # Iniciar/Finalizar jornada
+│   └── visitas/         # Fichaje de llegada/salida (lat/lng)
+├── config/              # db.php y cors.php
 └── src/
-    └── Models/              # Lógica de negocio (GestionVisitas.php, Usuario.php, Informe.php)
+    └── Models/          # Informe.php, GestionVisitas.php, Usuario.php
 
--Requisitos de la Base de Datos:
-El sistema utiliza el esquema unificado timeroute. Asegúrate de tener las siguientes tablas clave:
+## Endpoints Destacados
 
-usuarios: Credenciales y roles.
+1. Historial Diario (Admin)
+URL: /admin/obtener_informes.php?fecha=YYYY-MM-DD
 
-jornadas: Cabecera de la ruta diaria.
+Devuelve un desglose detallado de quién trabajó, qué clientes visitó y cuánto tiempo dedicó.
 
-rutas: Nombres y definiciones de trayectos.
+2. Hoja de Ruta (Trabajador)
+URL: /api/mis-jornadas/index.php?id_usuario=ID
 
-clientes: Datos maestros y geolocalización (lat, lng).
+Muestra la jornada activa de hoy, incluyendo paradas ordenadas y coordenadas.
 
-visitas: Detalle de paradas y tiempos reales.
+## Instalación Rápida
+Clona el repositorio en tu servidor local.
 
--Instalación y Uso:
-Clona el repositorio en tu servidor local (XAMPP/Laragon).
+Importa la base de datos timeroute.
 
-Importa el script SQL de la base de datos timeroute.
+Configura config/db.php con tus credenciales.
 
-Configura tus credenciales en config/db.php.
-
-Apunta tu Frontend de Angular a la URL base de esta API.
-
--Nota para los colaboradores:
-Para probar el sistema de fichaje, asegúrate de enviar las coordenadas del dispositivo en el cuerpo del JSON (lat, lng). El sistema devolverá un error 400 si el usuario se encuentra a más de 200 metros del destino.
+¡Listo! El Backend responderá en formato JSON.
