@@ -14,7 +14,7 @@ class Usuario {
     }
 
     public function leer() {
-        $query = "SELECT id_usuario, nombre, email, rol FROM " . $this->table_name;
+        $query = "SELECT id, nombre, email, rol FROM usuarios";
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         return $stmt;
